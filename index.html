@@ -75,7 +75,7 @@
         <input type="date" id="data">
         <input type="text" id="cliente" placeholder="Nome do Cliente">
         <input type="text" id="produto" placeholder="Produto">
-        <input type="number" id="valor" placeholder="Valor R$">
+        <input type="text" inputmode="decimal" id="valor" placeholder="0,00" class="moeda">
         <select id="status">
             <option value="nao">❌ Não Pago</option>
             <option value="sim">✅ Pago</option>
@@ -140,6 +140,60 @@
     </div>
 
     <script>
+        /* ========== FORMATAÇÃO MONETÁRIA (padrão brasileiro) ========== */
+        function parseMoeda(v){
+            if(typeof v==='number') return isFinite(v)?v:0;
+            let s=String(v==null?'':v).trim().replace(/R\$\s*/gi,'').replace(/\s/g,'');
+            if(!s) return 0;
+            if(s.indexOf(',')>-1) s=s.replace(/\./g,'').replace(',','.');
+            else if(/^\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,'');
+            const n=parseFloat(s);
+            return isFinite(n)?n:0;
+        }
+        function formatarMoedaString(valor,finalizar){
+            let s;
+            if(typeof valor==='number' && isFinite(valor)){
+                s=valor.toFixed(2).replace('.',',');
+            }else{
+                s=String(valor==null?'':valor).replace(/R\$\s*/gi,'').replace(/\s/g,'').replace(/[^\d.,]/g,'');
+                if(s.indexOf(',')>-1) s=s.replace(/\./g,'');
+                else if(/\.\d{1,2}$/.test(s)||/\.$/.test(s)) s=s.replace(/\.(\d*)$/,',$1');
+            }
+            if(s==='') return finalizar?'0,00':'';
+            const temVirgula=s.indexOf(',')>-1;
+            const partes=s.split(',');
+            const inteiro=(partes[0]||'').replace(/\D/g,'').replace(/^0+(?=\d)/,'');
+            const decimal=partes.length>1?partes.slice(1).join('').replace(/\D/g,'').slice(0,2):'';
+            const intFmt=inteiro.replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+            if(temVirgula) return (intFmt||'0')+','+(finalizar?decimal.padEnd(2,'0'):decimal);
+            return (intFmt||'0')+(finalizar?',00':'');
+        }
+        function aoDigitarMoeda(e){
+            const el=e.target;
+            const pos=el.selectionStart;
+            const noFim=(pos===el.value.length);
+            const digitosAntes=(el.value.slice(0,pos).match(/\d/g)||[]).length;
+            const formatado=formatarMoedaString(el.value,false);
+            el.value=formatado;
+            let novaPos=formatado.length;
+            if(!noFim){
+                if(digitosAntes===0){novaPos=0;}
+                else{
+                    let cont=0;
+                    for(let i=0;i<formatado.length;i++){
+                        if(/\d/.test(formatado[i])){cont++;if(cont===digitosAntes){novaPos=i+1;break;}}
+                    }
+                }
+            }
+            el.setSelectionRange(novaPos,novaPos);
+        }
+        const formatValor = (v) => (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+        const valorMoedaInput = document.getElementById('valor');
+        valorMoedaInput.addEventListener('input',aoDigitarMoeda);
+        valorMoedaInput.addEventListener('blur',()=>{if(valorMoedaInput.value.trim()!=='') valorMoedaInput.value=formatarMoedaString(valorMoedaInput.value,true);});
+        valorMoedaInput.addEventListener('focus',()=>valorMoedaInput.select());
+        /* =============================================================== */
+
         const CHAVE_NOME_CONFEITARIA = 'nome_confeitaria';
         const nomeConfeitariaSalvo = localStorage.getItem(CHAVE_NOME_CONFEITARIA);
         let nomeConfeitaria = nomeConfeitariaSalvo || '';
@@ -193,7 +247,7 @@
             const d = document.getElementById('data').value;
             const c = document.getElementById('cliente').value.trim();
             const p = document.getElementById('produto').value.trim();
-            const v = parseFloat(document.getElementById('valor').value);
+            const v = parseMoeda(document.getElementById('valor').value);
             const s = document.getElementById('status').value;
             const index = parseInt(document.getElementById('edit-index').value);
 
@@ -247,7 +301,7 @@
                     html += `
                     <div class="linha-venda">
                         <span class="cliente-nome">${p.cliente} <span class="badge-pago ${statusClass}">${statusTxt}</span></span>
-                        <span class="valor-txt">R$ ${p.valor.toFixed(2)}</span>
+                        <span class="valor-txt">R$ ${formatValor(p.valor)}</span>
                         <div class="prod-lista">${formatarDataBR(p.data)} - ${p.produto}</div>
                         <div class="acoes">
                             <button class="btn-acao btn-edit" onclick="prepararEdicao(${i})">✏️ Editar</button>
@@ -258,8 +312,8 @@
                 }
             }
 
-            cardPago.querySelector('strong').innerText = `R$ ${totalPago.toFixed(2)}`;
-            cardPendente.querySelector('strong').innerText = `R$ ${totalPendente.toFixed(2)}`;
+            cardPago.querySelector('strong').innerText = `R$ ${formatValor(totalPago)}`;
+            cardPendente.querySelector('strong').innerText = `R$ ${formatValor(totalPendente)}`;
             listaDiv.innerHTML = html || "<p style='text-align:center; color:#999;'>Nenhuma venda encontrada para o período selecionado.</p>";
         }
 
@@ -287,7 +341,7 @@
             document.getElementById('data').value = p.data;
             document.getElementById('cliente').value = p.cliente;
             document.getElementById('produto').value = p.produto;
-            document.getElementById('valor').value = p.valor;
+            document.getElementById('valor').value = formatarMoedaString(p.valor, true);
             document.getElementById('status').value = p.pago || 'nao';
             document.getElementById('edit-index').value = i;
             document.getElementById('btn-salvar').innerText = "ATUALIZAR";
@@ -314,7 +368,7 @@
         function enviarPedido(i) {
             const p = pedidos[i];
             const cabecalhoPedido = nomeConfeitaria ? `PEDIDO - ${nomeConfeitaria.toUpperCase()} - CONFEITARIA` : 'PEDIDO - CONFEITARIA';
-            const msg = `*${cabecalhoPedido}*\n\nOlá, *${p.cliente}*!\nDetalhes do pedido:\n\n📅 Data: ${formatarDataBR(p.data)}\n🎂 Produto: ${p.produto}\n💰 Valor: *R$ ${p.valor.toFixed(2)}*\n💳 PIX: 121.108.468-01\n\n\nObrigada! 👩🏻‍🍳`;
+            const msg = `*${cabecalhoPedido}*\n\nOlá, *${p.cliente}*!\nDetalhes do pedido:\n\n📅 Data: ${formatarDataBR(p.data)}\n🎂 Produto: ${p.produto}\n💰 Valor: *R$ ${formatValor(p.valor)}*\n💳 PIX: 121.108.468-01\n\n\nObrigada! 👩🏻‍🍳`;
             window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`);
         }
 
