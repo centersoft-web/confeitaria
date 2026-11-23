@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#060b1a">
+    <meta name="description"
+          content="-Aplicação para cadastrar pedidos, acompanhar vendas e controlar valores recebidos e pendentes."> 
     <title>Confeitaria</title>
     <link rel="icon" href="icon.ico" type="image/x-icon">
     <link rel="shortcut icon" href="icon.ico" type="image/x-icon">
@@ -407,10 +409,12 @@
         atualizarNomeConfeitaria();
         inicializarFiltros();
         renderizar();
-    </script>
+   </script>
 <script>
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js");
+  navigator.serviceWorker.register("/confeitaria/sw.js", {
+    scope: "/confeitaria/"
+  });
 }
 </script>
 </body>
